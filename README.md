@@ -512,11 +512,13 @@ private Runnable getTask() {
 
 ##### RunnableScheduledFuture讲解
 
+> 实现RunnableFuture接口，具有Future能力：获取执行结果和Runnable能力，run：执行能力
+>
+> 实现ScheduleFuture接口，具有得到延期时间能力和具有Future能力：获取执行结果,因为继承Futurn所以可以作为返回值
+
 ![RunnableScheduledFuture](https://raw.githubusercontent.com/dzhiqiang/PicGo-gallery/main/RunnableScheduledFuture.png)
 
-1. 接口说明 重点接口
 
-   实现RunnableFuture接口，具有Future能力：获取执行结果和Runnable能力，run：执行能力
 
-   实现ScheduleFuture接口，具有得到延期时间能力和具有Future能力：获取执行结果,因为继承Futurn所以可以作为返回值
+
 
