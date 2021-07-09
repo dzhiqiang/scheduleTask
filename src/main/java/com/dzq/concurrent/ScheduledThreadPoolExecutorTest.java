@@ -2,12 +2,13 @@ package com.dzq.concurrent;
 
 import org.junit.Test;
 
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 public class ScheduledThreadPoolExecutorTest {
-
+    // 增加定时任务
     @Test
     public void test_01() throws InterruptedException {
 
@@ -36,8 +37,8 @@ public class ScheduledThreadPoolExecutorTest {
             }
         }, 100, TimeUnit.MILLISECONDS);
         System.out.println("加载完成"+ System.currentTimeMillis());
-        Thread.currentThread().join();
 
+        Thread.currentThread().join();
     }
 
 }

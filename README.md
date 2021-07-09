@@ -287,12 +287,18 @@ public ThreadPoolExecutor(int corePoolSize,
 1. 关键属性
 
 > 因为底层使用的线程池，这次主讲延迟任务，只需要关注BlockingQueue<Runnable> workQueue属性
+>
+> DelayedWorkQueue类特性
+>
+> 1. 阻塞队列
+> 2. 根据延迟时间优先队列
 
 ```java
 public ScheduledThreadPoolExecutor(int corePoolSize) {
         super(corePoolSize, Integer.MAX_VALUE, 0, NANOSECONDS,
-              new DelayedWorkQueue());// 构造方法中workQueue为DelayedWorkQueue延迟队列，后面作为关键类介绍
+              new DelayedWorkQueue());// 构造方法中workQueue为DelayedWorkQueue延迟队列
 }
+
 ```
 
 2. 关键方法
@@ -303,7 +309,7 @@ public ScheduledThreadPoolExecutor(int corePoolSize) {
 // delay 延迟时间
 // unit 单位
 // triggerTime 计算延迟时间，方法简单不在单独介绍
-// decorateTask 封装Task任务，返回RunnableScheduledFuture，实现类ScheduledFutureTask继承FutureTask实现RunnableScheduledFuture，因为delayedExecute参数是RunnableScheduledFuture接口先搞清这个接口
+// decorateTask 封装Task任务，返回RunnableScheduledFuture，实现类ScheduledFutureTask继承FutureTask实现RunnableScheduledFuture，因为delayedExecute参数是RunnableScheduledFuture接口先搞清这个接口，ScheduledFutureTask继承Runnable
 // delayedExecute 执行任务
 public ScheduledFuture<?> schedule(Runnable command,
                                     long delay,
@@ -317,9 +323,200 @@ public ScheduledFuture<?> schedule(Runnable command,
     delayedExecute(t);
     return t;
 }
+// 延迟任务执行
+private void delayedExecute(RunnableScheduledFuture<?> task) {
+    // 线程池关闭 拒绝任务
+    if (isShutdown())
+        reject(task);
+    else {
+        // 在延迟队列中增加任务，后面介绍
+        super.getQueue().add(task);
+        // 如果已经关闭，判断是否在关闭的情况下还要执行，不在执行的话移除task
+        if (isShutdown() &&
+            !canRunInCurrentRunState(task.isPeriodic()) &&
+            remove(task))
+            task.cancel(false);
+        else
+            // 线程池开始执行，线程池内容不做过多介绍
+            // 当启动的线程数小于核心线程数时直接增加线程执行：分析这一种情况就可以了
+            ensurePrestart();
+    }
+}
+// 增加执行线程worker
+// firstTask此时为null
+// core 为true：启动的线程数小于核心线程数
+private boolean addWorker(Runnable firstTask, boolean core) {
+    retry:
+    // 判断状态 和 线程数量
+    // 线程池实现逻辑跟延迟队列关系不大，默认执行成功
+    for (;;) {
+        int c = ctl.get();
+        int rs = runStateOf(c);
+
+        // Check if queue empty only if necessary.
+        if (rs >= SHUTDOWN &&
+            ! (rs == SHUTDOWN &&
+               firstTask == null &&
+               ! workQueue.isEmpty()))
+            return false;
+
+        for (;;) {
+            int wc = workerCountOf(c);
+            if (wc >= CAPACITY ||
+                wc >= (core ? corePoolSize : maximumPoolSize))
+                return false;
+            if (compareAndIncrementWorkerCount(c))
+                break retry;
+            c = ctl.get();  // Re-read ctl
+            if (runStateOf(c) != rs)
+                continue retry;
+            // else CAS failed due to workerCount change; retry inner loop
+        }
+    }
+    // 新加的worker初始状态
+    boolean workerStarted = false;
+    boolean workerAdded = false;
+    Worker w = null;
+    try {
+        // 创建一个执行线程
+        w = new Worker(firstTask);
+        final Thread t = w.thread;
+        if (t != null) {
+            final ReentrantLock mainLock = this.mainLock;
+            mainLock.lock();
+            try {
+                // Recheck while holding lock.
+                // Back out on ThreadFactory failure or if
+                // shut down before lock acquired.
+                int rs = runStateOf(ctl.get());
+				// 状态正确，添加到线程池workers
+                if (rs < SHUTDOWN ||
+                    (rs == SHUTDOWN && firstTask == null)) {
+                    if (t.isAlive()) // precheck that t is startable
+                        throw new IllegalThreadStateException();
+                    workers.add(w);
+                    int s = workers.size();
+                    if (s > largestPoolSize)
+                        largestPoolSize = s;
+                    workerAdded = true;
+                }
+            } finally {
+                mainLock.unlock();
+            }
+            // 添加成功，开始执行Worker实现Runnable接口，启动线程，切换到Worker的run方法
+            if (workerAdded) {
+                t.start();
+                workerStarted = true;
+            }
+        }
+    } finally {
+        if (! workerStarted)
+            addWorkerFailed(w);
+    }
+    return workerStarted;
+}
+// 执行自己
+public void run() {
+    runWorker(this);
+}
+final void runWorker(Worker w) {
+    Thread wt = Thread.currentThread();
+    Runnable task = w.firstTask;
+    w.firstTask = null;
+    w.unlock(); // allow interrupts
+    boolean completedAbruptly = true;
+    try {
+        // 延迟队列执行把任务放入到阻塞队列中task为空，直接从队列中获取，队列为空，getTask()阻塞
+        // 因为是延迟队列，当任务有延迟，也会获取不到任务，阻塞
+        while (task != null || (task = getTask()) != null) {
+            w.lock();
+            // If pool is stopping, ensure thread is interrupted;
+            // if not, ensure thread is not interrupted.  This
+            // requires a recheck in second case to deal with
+            // shutdownNow race while clearing interrupt
+            if ((runStateAtLeast(ctl.get(), STOP) ||
+                 (Thread.interrupted() &&
+                  runStateAtLeast(ctl.get(), STOP))) &&
+                !wt.isInterrupted())
+                wt.interrupt();
+            try {
+                beforeExecute(wt, task);
+                Throwable thrown = null;
+                try {
+                    // 得到任务执行
+                    task.run();
+                } catch (RuntimeException x) {
+                    thrown = x; throw x;
+                } catch (Error x) {
+                    thrown = x; throw x;
+                } catch (Throwable x) {
+                    thrown = x; throw new Error(x);
+                } finally {
+                    afterExecute(task, thrown);
+                }
+            } finally {
+                task = null;
+                w.completedTasks++;
+                w.unlock();
+            }
+        }
+        completedAbruptly = false;
+    } finally {
+        processWorkerExit(w, completedAbruptly);
+    }
+}
+// 从队列中获取任务
+private Runnable getTask() {
+    boolean timedOut = false; // Did the last poll() time out?
+	// 有大量的校验工作，暂时先不管
+    for (;;) {
+        int c = ctl.get();
+        int rs = runStateOf(c);
+
+        // Check if queue empty only if necessary.
+        if (rs >= SHUTDOWN && (rs >= STOP || workQueue.isEmpty())) {
+            decrementWorkerCount();
+            return null;
+        }
+
+        int wc = workerCountOf(c);
+
+        // Are workers subject to culling?
+        boolean timed = allowCoreThreadTimeOut || wc > corePoolSize;
+
+        if ((wc > maximumPoolSize || (timed && timedOut))
+            && (wc > 1 || workQueue.isEmpty())) {
+            if (compareAndDecrementWorkerCount(c))
+                return null;
+            continue;
+        }
+
+        try {
+            // 判断Worker是否淘汰，选择是否阻塞
+            // poll不阻塞或者阻塞固定时间，如果时间耗尽则返回null
+            // take如果为空阻塞
+            Runnable r = timed ?
+                workQueue.poll(keepAliveTime, TimeUnit.NANOSECONDS) :
+            workQueue.take();
+            // 返回任务
+            if (r != null)
+                return r;
+            // r为null则timedOut为true 导致上面代码if ((wc > maximumPoolSize || (timed && timedOut)) 中的(timed && timedOut)为true，返回null，结束worker执行
+            timedOut = true;
+        } catch (InterruptedException retry) {
+            timedOut = false;
+        }
+    }
+}
 ```
 
 ##### RunnableScheduledFuture讲解
 
 ![RunnableScheduledFuture](https://raw.githubusercontent.com/dzhiqiang/PicGo-gallery/main/RunnableScheduledFuture.png)
+
+1. 接口说明 重点接口
+
+   实现RunnableFuture接口，具有Future能力：获取执行结果和Runnable能力，run：执行能力
+
+   实现ScheduleFuture接口，具有得到延期时间能力和具有Future能力：获取执行结果,因为继承Futurn所以可以作为返回值
 
