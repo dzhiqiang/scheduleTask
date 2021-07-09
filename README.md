@@ -11,6 +11,7 @@
 4. Timer是线程安全的。
 5. 不一定准时的执行，因为使用了Object.wait(long)方法。
 6. 可以使用Java5.0 java.util.concurrent 下的ScheduledThreadPoolExecutor是基于线程池模式的任务。
+7. 一个任务报错所有的任务都不能在执行
 
 ##### Timer内部实现
 
@@ -253,4 +254,72 @@ private void fixDown(int k) {
 }
 
 ```
+
+### ScheduledExecutorService 延迟任务
+
+##### 特性：
+
+1. 不仅可以延迟，周期性执行任务，而且继承ThreadPoolExecutor，具有线程池的灵活性和扩展性
+2. 能够多工作线程执行任务
+
+##### ScheduledExecutorService构造方法
+
+> 构造实现类ScheduledThreadPoolExecutor，因为继承了ThreadPoolExecutor，具有线程池能力，最终调用的是线程池构造方法
+
+```java
+// 使用的是ThreadPoolExecutor构造方法
+// corePoolSize核心线程数
+// maximumPoolSize线程总个数
+// keepAliveTime 线程存活时间
+// unit keepAliveTime的时间单位
+// workQueue 任务队列
+// threadFactory 创建线程的工厂
+// handler 线程满时的拒绝策略
+public ThreadPoolExecutor(int corePoolSize,
+                              int maximumPoolSize,
+                              long keepAliveTime,
+                              TimeUnit unit,
+                              BlockingQueue<Runnable> workQueue,
+                              ThreadFactory threadFactory,
+                              RejectedExecutionHandler handler)
+```
+
+1. 关键属性
+
+> 因为底层使用的线程池，这次主讲延迟任务，只需要关注BlockingQueue<Runnable> workQueue属性
+
+```java
+public ScheduledThreadPoolExecutor(int corePoolSize) {
+        super(corePoolSize, Integer.MAX_VALUE, 0, NANOSECONDS,
+              new DelayedWorkQueue());// 构造方法中workQueue为DelayedWorkQueue延迟队列，后面作为关键类介绍
+}
+```
+
+2. 关键方法
+
+```java
+// 延迟执行任务
+// command 需要执行的任务
+// delay 延迟时间
+// unit 单位
+// triggerTime 计算延迟时间，方法简单不在单独介绍
+// decorateTask 封装Task任务，返回RunnableScheduledFuture，实现类ScheduledFutureTask继承FutureTask实现RunnableScheduledFuture，因为delayedExecute参数是RunnableScheduledFuture接口先搞清这个接口
+// delayedExecute 执行任务
+public ScheduledFuture<?> schedule(Runnable command,
+                                    long delay,
+                                    TimeUnit unit) {
+    if (command == null || unit == null)
+        throw new NullPointerException();
+    // 
+    RunnableScheduledFuture<?> t = decorateTask(command,
+        new ScheduledFutureTask<Void>(command, null,
+                                      triggerTime(delay, unit)));
+    delayedExecute(t);
+    return t;
+}
+```
+
+##### RunnableScheduledFuture讲解
+
+![RunnableScheduledFuture](https://raw.githubusercontent.com/dzhiqiang/PicGo-gallery/main/RunnableScheduledFuture.png)
 
