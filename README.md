@@ -24,7 +24,7 @@ private final TaskQueue queue = new TaskQueue();
 
  ```java
  // 执行任务队列的线程
- private final TimerThread thread = new TimerThread(queue); 
+ private final TimerThread thread = new TimerThread(queue);
  ```
 
 2. 关键方法

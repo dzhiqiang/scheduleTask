@@ -26,7 +26,7 @@ public class QuartzTest {
 
         sched.start();
 
-        Thread.sleep(5L * 1000L);
+        Thread.sleep(5000L * 1000L);
 
         sched.shutdown(true);
 
