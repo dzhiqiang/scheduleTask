@@ -61,6 +61,8 @@ DirectSchedulerFactory.getInstance().createScheduler("My Quartz Scheduler", "My 
 
 ##### 关键方法
 
+> 在获取Schedule过程中比较重要的是：第9步ThreadPool启动执行QuartzSchedulerThread提交的Trigger和第12步QuartzSchedulerThread启动，QuartzSchedulerThread线程是查询可执行的trigger放入到线程池执行
+
 ```java
 // 获取默认的getScheduler
 public Scheduler getScheduler() throws SchedulerException {
@@ -131,7 +133,8 @@ public Scheduler getScheduler() throws SchedulerException {
     //        }
     // 7. 对ThreadPool设置schedName, schedInstId
     // 8. rsrcs.setThreadExecutor(threadExecutor);
-    // 9. rsrcs.setThreadPool(tp); tp初始化
+    // 9. rsrcs.setThreadPool(tp); 并tp初始化
+    //    tp.initialize();
     // 10. rsrcs.setJobStore(js);
     // 11. add plugins
     // 12. 创建qs QuartzScheduler(rsrcs,...) 关联上rsrcs,创建属性QuartzSchedulerThread并执行，创建SchedulerSignalerImpl
@@ -299,7 +302,7 @@ public Scheduler getScheduler() throws SchedulerException {
    }
    ```
 
-5. StdScheduler
+5. StdScheduler，最终调用QuartzScheduler的scheduleJob
 
    ```java
    // 执行JobDetail，执行时间Trigger，这2个类可以看下面分析
@@ -310,7 +313,7 @@ public Scheduler getScheduler() throws SchedulerException {
    }
    ```
 
-6. QuartzScheduler
+6. QuartzScheduler，最终向JobStore保存JobDetail和Trigger,被QuartzSchedulerThread获取，然后再线程池执行
 
    ```java
    public Date scheduleJob(JobDetail jobDetail,
