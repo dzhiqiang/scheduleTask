@@ -520,5 +520,5 @@ private Runnable getTask() {
 
 ### Quartz
 
-> 内容比较多，[点击链接查看](http://www.quartz-scheduler.org/documentation/quartz-2.2.2/examples/)
+> 内容比较多，[点击链接查看](https://github.com/dzhiqiang/scheduleTask/blob/main/quartz.md)
 
