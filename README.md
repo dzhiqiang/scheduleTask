@@ -1,6 +1,9 @@
 # scheduleTask
 延迟任务学习记录
 
+- [ ] 补充内存图
+- [ ] 时间轮算法
+
 ### java.util.Timer
 
 ##### 特性：
