@@ -252,7 +252,7 @@ public Scheduler getScheduler() throws SchedulerException {
    
       
    
-4. WorkThread
+4. WorkerThread
 
    ```java
    // 判断是否在执行中
@@ -556,3 +556,27 @@ public Scheduler getScheduler() throws SchedulerException {
        qsRsrcs = null;
    }
    ```
+
+##### quartz设计的思考
+
+还是延迟或者周期性执行任务，执行时间不在是long类型和单位，而是一个计算执行时间的Trigger,然后Trigger与Task（在quartz叫Job）对应。
+
+执行任务同样被拆分，1）谁执行任务2）任务执行，这次和jdk的任务不同的是，执行任务的时候有<u>**依赖**</u>,那么则携带参数Context
+
+1. 如何把jdk中的task转为Job,适配器模式
+
+```java
+public class TaskJob implements Job {
+    private Runnable runnable;
+    public TaskJob(Runnable runnable) {
+        this.runnable = runnable;
+    }
+    @Override
+    public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+        this.runnable.run();
+    }
+}
+```
+
+2. 异常处理加强印象：自己能处理的自己处理，自己没有处理方式的抛出异常
+   1. quartz任务执行失败只打印日志，不影响其他执行的任务。

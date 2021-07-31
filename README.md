@@ -547,6 +547,8 @@ private Runnable getTask() {
 
 还是基于定时或周期性执行任务的需求设计，但是执行的任务可以获得到结果（线程池特性）。执行的任务只需要实现Runnable接口，主要被封装在FuturnTask中，Runnable被封装在Callable接口中，所以可以获得返回值，比较经典的适配器模式。
 
+异常处理：被封装在Futurn中，结果为空，异常有值。
+
 ### Quartz
 
 > 内容比较多，[点击链接查看](https://github.com/dzhiqiang/scheduleTask/blob/main/quartz.md)
