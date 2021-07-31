@@ -24,6 +24,7 @@ public class ScheduledThreadPoolExecutorTest {
                 }
             }
         }, 1000, TimeUnit.MILLISECONDS);
+
         scheduledThreadPool.schedule(new Runnable() {
             public void run() {
                 System.out.println("开始执行2---" + System.currentTimeMillis());
