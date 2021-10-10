@@ -1,8 +1,9 @@
 # scheduleTask
-延迟任务学习记录
-
-- [ ] 补充内存图
-- [ ] 时间轮算法
+> 在项目中用到过很多次定时任务，延迟执行或者周期执行，但是底层是如何实现的从来没有看过，抱着学习的目的找了三个目前我认知内的定时工具来一一研究，分别为：
+>
+> 1. jdk最早的定时java.util.Timer
+> 2. jdk在线程池基础上实现的定时任务ScheduledExecutorService
+> 3. 目前比较知名的框架quartz
 
 ### java.util.Timer
 
@@ -14,7 +15,7 @@
 4. Timer是线程安全的。
 5. 不一定准时的执行，因为使用了Object.wait(long)方法。
 6. 可以使用Java5.0 java.util.concurrent 下的ScheduledThreadPoolExecutor是基于线程池模式的任务。
-7. 一个任务报错所有的任务都不能在执行
+7. 一个任务报错所有的任务都不能在执行。
 
 ##### Timer内部实现
 
@@ -26,7 +27,7 @@ private final TaskQueue queue = new TaskQueue();
 ```
 
  ```java
- // 执行任务队列的线程
+ // 获取任务，执行任务的线程
  private final TimerThread thread = new TimerThread(queue);
  ```
 
@@ -132,7 +133,6 @@ private void mainLoop() {
                 // 如果是空则不再while(true)循环，说明newTasksMayBeScheduled为flase
                 if (queue.isEmpty())
                     break; // Queue is empty and will forever remain; die
-
                 // Queue nonempty; look at first evt and do the right thing
                 // 当前时间，执行时间
                 long currentTime, executionTime;
