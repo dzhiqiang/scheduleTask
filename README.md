@@ -258,6 +258,28 @@ private void fixDown(int k) {
 
 ```
 
+##### Timer设计思考随写
+
+1. 需求：延迟或者周期性执行任务，如果是我自己来做的话如何设计？
+
+   1. 延迟或者周期，如何管控时间，如何执行最近的任务。使用object.wait方式实现等待多少秒执行，如果添加新任务直接唤醒，在重新获取最小（时间比较近的）任务。
+
+   2. 执行任务：转换成设计思维是2句话：1）谁执行任务；2）任务执行。转换程序Timer(谁)schedule(执行)TimerTask(任务)，任务（TimerTask）执行(run)。
+
+      任务自己能执行，和Timer类内部无关。那么执行的内容的数据结构由TimerTask自己决定。TimerTask实现Runnable接口，被定义成可执行的。
+
+      方法分析：schedule(TimerTask task, Date time) 几点 执行 任务，方法易于理解，但是TimerTask task，Date time的管理并不是那么容易想到。
+
+      1. 把Date转换成Task属性的一部分，结合最小堆，可以取到最近执行的任务，如果是我的话可能把date算成是Timer的属性，不会和最小堆结合。
+
+      2. 类和方法，接口的设计，主体+动作+主体的设计思路，主体则为类，动作则为方法。但是复杂程序，实体和动作一般都难以抽象。
+
+   3. 可以管控多个任务，设计到数据结构。最小堆控制，
+
+   4. 异常处理。Timer使用对象为程序员，没必要对null指针做出特殊处理，而且对于null也无从处理，只是对参数做出校验，直接抛出异常。
+
+
+
 ### ScheduledExecutorService 延迟任务
 
 ##### 特性：
@@ -520,6 +542,12 @@ private Runnable getTask() {
 > 实现ScheduleFuture接口，具有得到延期时间能力和具有Future能力：获取执行结果,因为继承Futurn所以可以作为返回值
 
 ![RunnableScheduledFuture](https://raw.githubusercontent.com/dzhiqiang/PicGo-gallery/main/RunnableScheduledFuture.png)
+
+##### Scheduler设计思考随写--其实更多的是线程池的思考
+
+还是基于定时或周期性执行任务的需求设计，但是执行的任务可以获得到结果（线程池特性）。执行的任务只需要实现Runnable接口，主要被封装在FuturnTask中，Runnable被封装在Callable接口中，所以可以获得返回值，比较经典的适配器模式。
+
+异常处理：被封装在Futurn中，结果为空，异常有值。
 
 ### Quartz
 

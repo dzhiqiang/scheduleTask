@@ -22,6 +22,8 @@ public class QuartzTest {
                 .startAt(new Date())
                 .build();
 
+        Trigger trigger1 = TriggerBuilder.newTrigger().withSchedule(CronScheduleBuilder.cronSchedule("* * * * * * *")).startAt(new Date()).build();
+
         sched.scheduleJob(job, trigger);
 
         sched.start();

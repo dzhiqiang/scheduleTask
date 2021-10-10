@@ -76,7 +76,7 @@ public Scheduler getScheduler() throws SchedulerException {
         // 加载配置文件或者配置的属性策略可以学习
         initialize();
     }
-    // 懒汉单例的SchedulerRepository，里面封装Map<String, Scheduler>
+    // 饱汉式单例的SchedulerRepository，里面封装Map<String, Scheduler>
     SchedulerRepository schedRep = SchedulerRepository.getInstance();
     // 根据schedule名称得到Schedule，从PropertiesParser中获取属性为org.quartz.scheduler.instanceName: DefaultQuartzScheduler
     Scheduler sched = schedRep.lookup(getSchedulerName());
@@ -252,7 +252,7 @@ public Scheduler getScheduler() throws SchedulerException {
    
       
    
-4. WorkThread
+4. WorkerThread
 
    ```java
    // 判断是否在执行中
@@ -281,7 +281,7 @@ public Scheduler getScheduler() throws SchedulerException {
                    }
                }
            } catch (InterruptedException unblock) {
-               // 异常处理
+               // 异常处理,只是打印日志，不会抛出异常
            } finally {
                synchronized(lock) {
                    runnable = null;
@@ -556,3 +556,75 @@ public Scheduler getScheduler() throws SchedulerException {
        qsRsrcs = null;
    }
    ```
+
+##### quartz设计的思考
+
+还是延迟或者周期性执行任务，执行时间不在是long类型和单位，而是一个计算执行时间的Trigger,然后Trigger与Task（在quartz叫Job）对应。
+
+执行任务同样被拆分，1）谁执行任务2）任务执行，这次和jdk的任务不同的是，执行任务的时候有<u>**依赖**</u>,那么则携带参数Context
+
+1. 如何把jdk中的task转为Job,适配器模式
+
+```java
+public class TaskJob implements Job {
+    private Runnable runnable;
+    public TaskJob(Runnable runnable) {
+        this.runnable = runnable;
+    }
+    @Override
+    public void execute(JobExecutionContext jobExecutionContext) throws JobExecutionException {
+        this.runnable.run();
+    }
+}
+```
+
+2. 异常处理加强印象：自己能处理的自己处理，自己没有处理方式的抛出异常
+   
+   1. quartz任务执行失败只打印日志，不影响其他执行的任务。
+   
+3. 设计模式
+
+   1. 工厂模式：StdSchedulerFactory，创建StdScheduler的工厂，无参，所有的属性都是从classpath中的配置文件中获取，特定的工厂创建特定的类。一般无参数。
+
+      ```
+      // 无参数，就能够创建出来
+      SchedulerFactory sf = new StdSchedulerFactory();
+      ```
+
+   2. 构造器模式：需要一些必须的参数，并不是所有的参数都是必须的，都具有一些行为意义，比如TriggerBuilder.startAt(),并不是属性，而是具有一定的实际意义。在什么时候开始执行，虽然内部的属性是startTime. quartz还可以创建不同的Trigger.Builder里面还有一个builder，创建真正的Trigger.那个跟工厂模式类似。和工厂的区别是具有不同的参数，是跟创建这个类特定的的参数
+
+      ```java
+      // 能够创建Trigger,但是不同的Trigger里面的构造方法的参数还不一样
+      // 比如Corn模式下就需要表达式，那么在TriggerBuilder有真正的创建Trigger的Builder.这些build有不同的参数，不同的类也是一种builder模式
+      Trigger trigger = TriggerBuilder.newTrigger()
+              .withIdentity("trigger1", "group1")
+              .startAt(new Date())
+              .build();
+      // TriggerBuilder里面重要的参数，默认情况下是SimpleScheduleBuilder类
+      scheduleBuilder = SimpleScheduleBuilder.simpleSchedule();
+      // scheduleBuilder属性同时也可以通过withSchedule的方式赋值不同的Builder，下面的实例中创建了CronScheduleBuilder。创建的Trigger需要表达式。
+      TriggerBuilder.newTrigger().withSchedule(CronScheduleBuilder.cronSchedule("* * * * * * *"))
+      ```
+
+      与Executors.newScheduledThreadPool(1);做对比，都是具体的核心属性，Builder方式没什么实际意义，而且参数比较多。
+
+   3. 单例模式：
+
+      ```java
+      public class SchedulerRepository {
+          private HashMap<String, Scheduler> schedulers;
+          private static SchedulerRepository inst;
+          // 私有的构造方法。
+          private SchedulerRepository() {
+              schedulers = new HashMap<String, Scheduler>();
+          }
+          // 静态单例模式，饱汉式
+          public static synchronized SchedulerRepository getInstance() {
+              if (inst == null) {
+                  inst = new SchedulerRepository();
+              }
+      
+              return inst;
+          }
+      ```
+
